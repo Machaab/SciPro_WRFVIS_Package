@@ -428,7 +428,7 @@ def write_html_skewT(lon, lat, time_index, directory=None):
 
     # extract vertical profile for SkewT and MSE 
     print('Extracting vertical profile for SkewT and MSE')
-    df,pressure,temp,mixing_ratio,geo_hght,dewpoint,prof, lcl_pressure,lcl_temperature,\
+    df,pressure,temp,specific_humidity,geo_hght,dewpoint,prof, lcl_pressure,lcl_temperature,\
     lfc_pressure,lfc_temperature = sm.skewT_and_Mse_dataframe(time_index,lon,lat)
     
     print('Extracting severe weather parameters')
@@ -446,7 +446,7 @@ def write_html_skewT(lon, lat, time_index, directory=None):
     #plot the MSE
     print('plotting MSE')
     png_mse = os.path.join(directory, 'MSE.png')
-    sm.mse_plot(df,pressure,temp,mixing_ratio,geo_hght,filepath=png_mse)
+    sm.mse_plot(df,pressure,temp,specific_humidity,geo_hght,filepath=png_mse)
 
     # create HTML from template
     outpath = os.path.join(directory, 'skewT_MSE.html')
