@@ -1,9 +1,8 @@
+
 """
 Module to create SkewT plots from WRF output data.
 
-This module provides functions to read WRF (Weather Research and Forecasting) output files,
-extract vertical profiles, and generate SkewT plots. Additionally, it includes functionality 
-to plot Moist Static Energy (MSE) diagrams.
+This module provides functions to read WRF (Weather Research and Forecasting) output files, extract vertical profiles, and generate SkewT plots. Additionally, it includes functionality to plot Moist Static Energy (MSE) diagrams.
 
 Functions
 ---------
@@ -29,15 +28,16 @@ Functions
     Calculates severe weather parameters, including K-Index and Total Totals Index.
 
 8. `mixed_layer_properties(pressure, temperature, prof)`: 
-    Calculates mixed-layer parcel properties, including Mixed-Layer Convective Available Potential 
-    Energy (MLCAPE) and Convective Inhibition (MLCIN).
+    Calculates mixed-layer parcel properties, including Mixed-Layer Convective Available Potential Energy (MLCAPE) and Convective Inhibition (MLCIN).
 
 9. `unstable_parcel_properties(pressure, temperature, dewpoint, zlev)`: 
-    Calculates properties of the most unstable parcel, including Most Unstable Convective Available Potential Energy 
-    (MUCAPE) and Convective Inhibition (MUCIN).
+    Calculates properties of the most unstable parcel, including Most Unstable Convective Available Potential Energy (MUCAPE) and Convective Inhibition (MUCIN).
 
 10. `surface_based_cape_cin(pressure, temperature, dewpoint)`: 
     Calculates Surface-based Convective Available Potential Energy (SBCAPE) and Convective Inhibition (SBCIN).
+    
+11. `specific_humidity(mixing_ratio)`:
+     Calculates specific humidity from the mixing ratio.
 
 Author
 ------
@@ -89,13 +89,11 @@ Ensure that the required dependencies are installed before using the module.
 
 
 import sys
-import numpy as np
 import pandas as pd
 import xarray as xr
-
+import numpy as np
 import metpy.calc as mpcalc
 from metpy.units import units
-
 from wrfvis import cfg, grid
 
 
@@ -140,7 +138,6 @@ def extration_vertial_profile(param,lon,lat):
         var_array.attrs['distance_to_grid_point'] = ngcdist
         var_array.attrs['lon_grid_point'] = ds.XLONG.to_numpy()[0, ngcind[0], ngcind[1]]
         var_array.attrs['lat_grid_point'] = ds.XLAT.to_numpy()[0, ngcind[0], ngcind[1]]
-            #extracting the hght for the MSE plot
               
     return var_array
     
@@ -177,12 +174,15 @@ def extration_skewT_variables(time_index,lon,lat):
             # add information about the variable
             df[var_name].attrs['variable_name'] = var_name
             df[var_name].attrs['units'] = extract_var.attrs.get('units')
-        
-            df[var_name].attrs['Xtime'] = extract_var.XTIME
+            
             # Convert numpy.datetime64 to a datetime.datetime object
-            time_datetime = pd.to_datetime(df[var_name].attrs['Xtime'].values)
-            # Format the datetime as a string with the desired format
-            df.attrs['time']=  time_datetime.tz_localize('UTC')
+            time_datetime = pd.to_datetime(extract_var['Time'].values)
+            time_datetime =time_datetime[time_index]
+            
+            # Using timezone-aware objects to represent datetimes in UTC
+            df.attrs['time'] = time_datetime.tz_localize('UTC').strftime('%d %b %Y, %H:%M')
+            
+
             df.attrs['lon_grid_point'] = extract_var.lon_grid_point
             df.attrs['lat_grid_point'] = extract_var.lat_grid_point
     except:
@@ -226,9 +226,29 @@ def convert_var_to_actual_values(df):
 
     return df['Temperature_to_deg'],df['Pressure'],df['QVAPOR'],df['geopot_hgt']
 
+def specific_humidity(mixing_ratio):
+    """
+    Calculate specific humidity from mixing ratio.
+
+    Parameters
+    ----------
+    mixing_ratio : float
+        Mixing ratio of water vapor to dry air, typically in kg/kg.
+
+    Returns
+    -------
+    specific_humdity :p d.DataFrame
+        Specific humidity is unitless, as it represents a fraction.
+
+
+    """
+    # Convert mixing ratio to specific humidity
+    specific_humidity = mixing_ratio / (1 + mixing_ratio)
+    
+    return specific_humidity
     
        
-def calculation_dewpoint(temp,pressure,mixing_ratio):
+def calculation_dewpoint(temp,pressure,specific_humidity):
     """
     calculating dewpoint temperature using metpy package.
     
@@ -250,7 +270,7 @@ def calculation_dewpoint(temp,pressure,mixing_ratio):
     # Calculate dewpoint using specific humidity
     dewpoint= mpcalc.dewpoint_from_specific_humidity(pressure.values*units('hPa'),
                                                      temp.values*units('degC'),
-                                                      mixing_ratio.values*units('kg/kg'))
+                                                      specific_humidity.values*units('kg/kg'))
     #rounding to 2.d place
     dewpoint = np.round(dewpoint,2)
     return dewpoint
@@ -349,6 +369,7 @@ def severe_weather_par(pressure,temperature,dewpoint,height):
     totals_index = mpcalc.total_totals_index(pressure.values*units('hPa'), 
                                              temperature.values*units('degC'),
                                              dewpoint.magnitude*units('degC'))
+
     return kindex, totals_index
 
 
@@ -460,3 +481,7 @@ def surface_based_cape_cin(pressure, temperature, dewpoint):
                                                   dewpoint.magnitude * units('degC'))
     
     return sbcape, sbcin
+
+
+
+   
