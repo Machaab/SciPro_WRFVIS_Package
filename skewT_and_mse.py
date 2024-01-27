@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jan 11 15:18:41 2024
+
+@author: Matilda Achaab
+"""
+
 """
 wrfvis: Module for SkewT and Moist Static Energy (MSE) Plots from WRF Output Data
 
@@ -91,12 +98,12 @@ from metpy.units import units
 import matplotlib.pyplot as plt
 from metpy.plots import SkewT
 from MSEplots import plots as mpt
-from wrfvis import extraction_and_calculation as ec
+from wrfvis import extration_and_calculation as ec
 
 
 def skewT_and_Mse_dataframe(time_index,lon,lat):
     """
-    Extraction of all the dataset required for the skewT.
+    Extration of all the dataset required for the skewT.
     
     Parameters
     ----------
@@ -133,11 +140,12 @@ def skewT_and_Mse_dataframe(time_index,lon,lat):
     
     df = ec.extration_skewT_variables(time_index,lon,lat)
     temp,pressure,mixing_ratio,geo_hght =  ec.convert_var_to_actual_values(df)
-    dewpoint = ec.calculation_dewpoint(temp,pressure,mixing_ratio)
+    specific_humidity = ec.specific_humidity(mixing_ratio)
+    dewpoint = ec.calculation_dewpoint(temp,pressure,specific_humidity)
     prof = ec.parcel_profie(temp,pressure,dewpoint)
     lcl_pressure, lcl_temperature,lfc_pressure,lfc_temperature = ec.attris_of_skewT(pressure,temp,dewpoint)
     
-    return (df,pressure,temp,mixing_ratio,geo_hght,dewpoint,prof,
+    return (df,pressure,temp,specific_humidity,geo_hght,dewpoint,prof,
         lcl_pressure,lcl_temperature,lfc_pressure,lfc_temperature)
 
 
@@ -249,11 +257,11 @@ def skewT_plot(df, pressure, temperature, dewpoint, uwind, vwind,
     fig = plt.figure(figsize=(15, 8))
     skew = SkewT(fig, rotation=45, rect=(0.05, 0.05, 0.50, 0.90))
 
-    title = ('WRF time series at location {:.2f}$^{{\circ}}$E/{:.2f}$^{{\circ}}$N,'
-            + '\nModel initialization time: {:%d %b %Y, %H%M} UTC')
+    title = ('WRF vertical profile at location {:.2f}$^{{\circ}}$E/{:.2f}$^{{\circ}}$N,'
+            + '\nSkewT time {:} UTC')
 
     plt.title(title.format(df.attrs['lon_grid_point'], df.attrs['lat_grid_point'],
-                           df.attrs['time'][0], loc='left'))
+                           df.attrs['time'], loc='left'))
 
     # Customize labels
     skew.ax.set_ylabel('Pressure (hPa)')
@@ -268,7 +276,6 @@ def skewT_plot(df, pressure, temperature, dewpoint, uwind, vwind,
     skew.plot_barbs(pressure, uwind, vwind)
     skew.plot(lcl_pressure, lcl_temperature, 'ko', label='LCL')
     skew.plot(lfc_pressure, lfc_temperature, 'bo', label='LFC')
-    
     # Additional Skew-T features
     skew.plot_dry_adiabats()
     skew.plot_moist_adiabats()
@@ -317,13 +324,16 @@ def skewT_plot(df, pressure, temperature, dewpoint, uwind, vwind,
     plt.figtext(0.60, 0.40, f'K-INDEX: {kindex:.0f~P}', weight='bold', fontsize=15,
                 color='black', ha='left')
     
-    # Save the figure
-    plt.savefig(filepath, dpi=150)
-
+    #plot the MSE
+    if filepath is None: 
+        plt.savefig(filepath, dpi=150)
+        print(f"Skew-T plot saved as: {filepath}")
+   
     return fig
 
 
-def mse_plot(df,pressure,temperature,water_vapor,zlev,filepath =None):
+
+def mse_plot(df,pressure,temperature,specific_humidity,zlev,filepath =None):
     """
     @authors: Matilda Achaab
     
@@ -350,18 +360,21 @@ def mse_plot(df,pressure,temperature,water_vapor,zlev,filepath =None):
         The generated Matplotlib Figure containing Moist Static Energy Diagrams.
     """
     
-    title = ('WRF time series at location {:.2f}$^{{\circ}}$E/{:.2f}$^{{\circ}}$N,'
-             + '\nModel initialization time: {:%d %b %Y, %H%M} UTC')
+    title = ('WRF Moist static energy plot at location {:.2f}$^{{\circ}}$E/{:.2f}$^{{\circ}}$N,'
+             + '\nMSE time: {:} UTC')
 
-    plt.title(title.format(df.attrs['lon_grid_point'], df.attrs['lat_grid_point'],
-                           df.attrs['time'][0], loc='left'))
 
     fig = plt.figure(figsize=(8, 6))
-    fig, ax= mpt.msed_plots(pressure.values, temperature.values,water_vapor.values, 
+    fig, ax= mpt.msed_plots(pressure.values, temperature.values,specific_humidity.values, 
                        zlev.values, h0_std=2000, ensemble_size=20,
                        ent_rate=np.arange(0, 2, 0.05), entrain=False)
     
-    # Save the figure
-    plt.savefig(filepath, dpi=150)
+    plt.title(title.format(df.attrs['lon_grid_point'], df.attrs['lat_grid_point'],
+                           df.attrs['time'], loc='left'))
     
+    #plot the Mse
+    if filepath is None: 
+        plt.savefig(filepath, dpi=150)
+        plt.close()
+        print(f"MSE plot saved as: {filepath}")  
     return fig
